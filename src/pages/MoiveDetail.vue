@@ -4,29 +4,23 @@
   </v-col>
 
   <div v-else>
-    <!-- Breadcrumb -->
     <v-breadcrumbs :items="items">
       <template v-slot:divider>
         <v-icon icon="mdi-chevron-right"></v-icon>
       </template>
     </v-breadcrumbs>
 
-    <!-- Bố cục hai cột -->
     <v-row dense>
-      <!-- Cột bên trái: Video + nút + danh sách tập + info -->
       <v-col cols="12" md="10">
-        <!-- VIDEO -->
         <div
           class="video-wrapper"
           v-html="generateEmbedHtml(movie.videoUrl)"
         ></div>
 
-        <!-- Nhóm nút + server -->
         <div
           class="d-flex align-center justify-space-between flex-wrap px-4 py-2"
           style="background-color: #1a1a1a"
         >
-          <!-- Nút chức năng -->
           <div class="d-flex align-center flex-wrap" style="gap: 16px">
             <v-btn variant="text" @click="getTrailer()">
               <v-icon start icon="mdi-youtube" />
@@ -43,7 +37,6 @@
             >
           </div>
 
-          <!-- Server -->
           <div class="d-flex" style="gap: 8px">
             <v-tabs
               v-model="tabserver"
@@ -62,7 +55,6 @@
           </div>
         </div>
 
-        <!-- Danh sách tập -->
         <v-card class="my-4" variant="flat" color="grey-darken-4" theme="dark">
           <v-card-title class="d-flex align-center">
             <span class="text-h6">{{ movie.title }}</span>
@@ -94,7 +86,6 @@
           </v-card-text>
         </v-card>
 
-        <!-- Thông tin phim -->
         <v-card
           class="pa-6 text-left"
           color="grey-darken-4"
@@ -126,7 +117,6 @@
           </v-card-text>
         </v-card>
 
-        <!-- Bình luận -->
         <v-card flat color="#1e1e1e" class="pa-6 rounded-xl elevation-2 mt-6">
           <h2 class="text-white mb-6 text-h5 font-weight-bold">🗨️ {{$t('Bình luận')}}</h2>
           <v-text-field
@@ -176,8 +166,6 @@
         </v-card>
       </v-col>
 
-      <!-- Cột bên phải: Gợi ý -->
-      <!-- Cột bên phải: Gợi ý chỉ hiện trên desktop -->
       <v-col cols="12" md="2" v-show="$vuetify.display.mdAndUp">
         <v-card class="pa-0" color="grey-darken-4" flat>
           <v-tabs v-model="tab" background-color="grey-darken-3" grow>
@@ -222,7 +210,6 @@
         </v-card>
       </v-col>
 
-      <!-- Gợi ý mở rộng bên dưới chỉ hiện trên desktop -->
       <div class="suggested-movies my-8">
         <h2 class="text-h5 mb-4">🎬 {{$t('Phim được đề xuất')}}</h2>
         <v-row>
@@ -259,7 +246,6 @@
       </div>
     </v-row>
 
-    <!-- dialog share -->
     <v-dialog v-model="shareDialog" max-width="500">
       <v-card class="pa-4" style="background-color: #1e1e1e; color: white">
         <v-card-title class="text-h6 justify-center">Chia sẻ</v-card-title>
@@ -332,7 +318,6 @@
         </v-btn>
       </v-card>
     </v-dialog>
-    <!-- Snackbar -->
     <v-snackbar v-model="mess" :timeout="3000" :color="color">
       {{ Message }}
     </v-snackbar>
@@ -424,15 +409,11 @@ export default {
             this.movie.trailer_url = result.movie.trailer_url;
             this.movie.name = result.movie.name;
 
-            // if (result.data.seoOnPage) {
-            //   this.updateMetaTags(result.data.seoOnPage)
-            // }
             if (
               result.movie.status == "trailer" ||
-              result.episodes[0].server_data[0].link_embed == ""
+              !result.episodes[0].server_data[0].link_m3u8
             ) {
               this.movie.videoUrl = result.movie.trailer_url;
-              // this.movie.title = result.movie.name;
               this.isTrailer = true;
             } else {
               if (
@@ -441,8 +422,7 @@ export default {
                 this.movie.page.includes("/")
               ) {
                 this.movie.videoUrl =
-                  result.episodes[0].server_data[0].link_embed;
-                // this.movie.title = result.movie.name;
+                  result.episodes[0].server_data[0].link_m3u8;
                 this.isTrailer = false;
               } else {
                 var tap = this.movie.page.split("Tập ")[1].trim();
@@ -450,21 +430,17 @@ export default {
                   (ep) => ep.slug === tap
                 );
                 if (data) {
-                  this.movie.videoUrl = data.link_embed;
-                  // this.movie.title = data.filename;
+                  this.movie.videoUrl = data.link_m3u8;
                   this.isTrailer = false;
                 } else {
                   const data = result.episodes[1].server_data.find(
                     (ep) => ep.slug === tap
                   );
                   if (data) {
-                    this.movie.videoUrl = data.link_embed;
-                    // this.movie.title = data.filename;
+                    this.movie.videoUrl = data.link_m3u8;
                     this.isTrailer = false;
                   }
                 }
-                // this.movie.videoUrl = result.episodes[0].server_data[tap-1].link_embed
-                // this.isTrailer = false;
               }
             }
             console.log(this.movie.videoUrl);
@@ -485,15 +461,12 @@ export default {
     getOptimizedImage(imagePath) {
       return `${this.urlImage + encodeURIComponent(imagePath)}&w=384&q=100`;
     },
-    // Chuản SEO
     updateMetaTags(seo) {
       document.title = seo.titleHead || "Phim hay";
-
       const removeOldMeta = (key, attr = "name") => {
         const old = document.querySelectorAll(`meta[${attr}="${key}"]`);
         old.forEach((tag) => tag.remove());
       };
-
       const setMeta = (key, content, attr = "name") => {
         if (!content) return;
         const meta = document.createElement("meta");
@@ -501,20 +474,15 @@ export default {
         meta.setAttribute("content", content);
         document.head.appendChild(meta);
       };
-
-      // Xóa cũ
       removeOldMeta("description");
       removeOldMeta("og:title", "property");
       removeOldMeta("og:description", "property");
       removeOldMeta("og:type", "property");
       removeOldMeta("og:image", "property");
-
-      // Thêm mới
       setMeta("description", seo.descriptionHead);
       setMeta("og:title", seo.titleHead, "property");
       setMeta("og:description", seo.descriptionHead, "property");
       setMeta("og:type", seo.og_type || "website", "property");
-
       if (Array.isArray(seo.og_image)) {
         seo.og_image.forEach((img) => {
           setMeta("og:image", img, "property");
@@ -524,7 +492,6 @@ export default {
     ListMovieByCate() {
       ListMovieByCate(
         this.movie.categoris,
-
         (data) => {
           if (data.status == "success") {
             this.suggestedMovies = data.data.items;
@@ -540,12 +507,8 @@ export default {
     shareMovie() {
       this.shareDialog = true;
     },
-
     shareTo(platform) {
-      // const url = encodeURIComponent(shareUrl.value);
-      // const text = encodeURIComponent("Xem phim này nè!");
       let shareLink = "";
-
       switch (platform) {
         case "facebook":
           shareLink = `https://www.facebook.com/sharer/sharer.php`;
@@ -557,8 +520,6 @@ export default {
           shareLink = `https://twitter.com`;
           break;
       }
-      // const shareUrl = window.location.href;
-
       window.open(shareLink, "_blank");
     },
     ResponseError(){
@@ -622,7 +583,6 @@ export default {
         }
       );
     },
-
     scrollLeft() {
       const container = this.$refs.slideWrapper;
       if (container) {
@@ -640,8 +600,7 @@ export default {
     },
     playEpisode(episode) {
       this.isLoading = true;
-      // this.movie.title = episode.filename;
-      this.movie.videoUrl = episode.link_embed;
+      this.movie.videoUrl = episode.link_m3u8;
       this.movie.page = "Tập " + episode.slug;
       this.GetComment();
       this.isLoading = false;
@@ -654,57 +613,46 @@ export default {
         this.movie.page.toUpperCase().includes("HOÀN TẤT") ||
         this.movie.page.includes("/")
       ) {
-        this.movie.videoUrl = server.server_data[0].link_embed;
+        this.movie.videoUrl = server.server_data[0].link_m3u8;
         this.isTrailer = false;
       } else {
         var tap = this.movie.page.split("Tập ")[1].trim();
         const data = server.server_data.find((ep) => ep.slug === tap);
         if (data) {
-          this.movie.videoUrl = data.link_embed;
+          this.movie.videoUrl = data.link_m3u8;
           this.isTrailer = false;
         }
       }
-
       this.GetComment();
       this.isLoading = false;
     },
     generateEmbedHtml(url) {
-      if (this.isTrailer) {
-        const youtubeMatch = url.match(
-          /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^\s&]+)/
-        );
-        if (youtubeMatch) {
-          const videoId = youtubeMatch[1];
-          return `
-            <iframe width="100%" height="600"
-              src="https://www.youtube.com/embed/${videoId}"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen loading="lazy">
-            </iframe>
-          `;
-        } else {
-          // Nếu không phải YouTube thì giả sử là .mp4 và dùng thẻ video
-          return `
-            <video width="100%" height="600" controls>
-              <source src="${url}" type="video/mp4">
-              Trình duyệt của bạn không hỗ trợ video.
-            </video>
-          `;
-        }
-        //return `<video width="100%" height="600" controls><source src="${url}" type="video/mp4">Trình duyệt của bạn không hỗ trợ video.</video> `;
+      const youtubeMatch = url.match(
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^\s&]+)/
+      );
+      if (youtubeMatch) {
+        const videoId = youtubeMatch[1];
+        return `
+          <iframe width="100%" height="600"
+            src="https://www.youtube.com/embed/${videoId}"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen loading="lazy">
+          </iframe>
+        `;
       } else {
+        // Sử dụng player ngoài cho link_m3u8
         return `<div style="position: relative; width: 100%; padding-bottom: 56.25%; ">
-      <iframe
-        src="${url}"
-        frameborder="0"
-        class="w-full h-full"
-        loading="eager"
-        allowfullscreen
-        allow="autoplay; fullscreen"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-      ></iframe>
-    </div>`;
+            <iframe
+              src="https://luxysiv.github.io/player?url=${encodeURIComponent(url)}"
+              frameborder="0"
+              class="w-full h-full"
+              loading="eager"
+              allowfullscreen
+              allow="autoplay; fullscreen"
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+            ></iframe>
+          </div>`;
       }
     },
   },
