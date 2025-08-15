@@ -644,7 +644,7 @@ export default {
         // Sử dụng player ngoài cho link_m3u8
         return `<div style="position: relative; width: 100%; padding-bottom: 56.25%; ">
             <iframe
-              src="https://player-3fr.pages.dev?url=${encodeURIComponent(url)}"
+              src="https://manhd89.github.io/player?url=${encodeURIComponent(url)}"
               frameborder="0"
               class="w-full h-full"
               loading="eager"
