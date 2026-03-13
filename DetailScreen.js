@@ -5,10 +5,18 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  Image,
+  StyleSheet,
 } from "react-native";
+
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEvent } from "expo";
 import axios from "axios";
+
+const IMAGE_DOMAIN = "https://img.ophim.live/uploads/movies/";
+
+/* ---------------- VIDEO PLAYER ---------------- */
 
 function VideoPlayer({ uri }) {
   const player = useVideoPlayer(
@@ -20,9 +28,11 @@ function VideoPlayer({ uri }) {
 
   useEvent(player, "playingChange");
 
+  if (!uri) return null;
+
   return (
     <VideoView
-      style={{ flex: 1, minHeight: 220 }}
+      style={styles.player}
       player={player}
       nativeControls
       fullscreenOptions={{ enable: true }}
@@ -31,122 +41,241 @@ function VideoPlayer({ uri }) {
   );
 }
 
+/* ---------------- DETAIL SCREEN ---------------- */
+
 export default function DetailScreen({ route }) {
   const { slug } = route.params;
+
   const [movie, setMovie] = useState(null);
+  const [servers, setServers] = useState([]);
   const [selectedServer, setSelectedServer] = useState(null);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios
-      .get(`https://ophim1.com/v1/api/phim/${slug}`)
-      .then((res) => {
-        const data = res.data.data.item;
-        setMovie(data);
-        // chọn server đầu tiên và tập đầu tiên mặc định
-        const firstServer = data.episodes[0];
-        setSelectedServer(firstServer);
-        setSelectedEpisode(firstServer.server_data[0]);
-      })
-      .catch((err) => {
-        console.error("Error fetching movie detail:", err);
-      })
-      .finally(() => setLoading(false));
+    fetchMovie();
   }, [slug]);
+
+  const fetchMovie = async () => {
+    try {
+      const res = await axios.get(
+        `https://ophim1.com/v1/api/phim/${slug}`
+      );
+
+      const item = res.data?.data?.item;
+
+      setMovie(item);
+
+      if (item?.episodes?.length) {
+        const firstServer = item.episodes[0];
+
+        setServers(item.episodes);
+        setSelectedServer(firstServer);
+
+        // KHÔNG chọn tập mặc định
+        setSelectedEpisode(null);
+      }
+    } catch (err) {
+      console.log("API ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ---------------- LOADING ---------------- */
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Đang tải chi tiết phim...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+        <Text>Đang tải phim...</Text>
       </View>
     );
   }
 
-  if (!movie) return <Text>Không tìm thấy phim</Text>;
+  if (!movie) {
+    return (
+      <View style={styles.center}>
+        <Text>Không tìm thấy phim</Text>
+      </View>
+    );
+  }
+
+  const cleanContent = movie.content
+    ? movie.content.replace(/<[^>]*>/g, "")
+    : "";
+
+  /* ---------------- UI ---------------- */
 
   return (
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 22, fontWeight: "bold", margin: 10 }}>
-        {movie.name}
-      </Text>
-      <Text style={{ marginHorizontal: 10, color: "gray" }}>
-        {movie.year} • {movie.lang}
-      </Text>
-      <Text style={{ marginHorizontal: 10, marginVertical: 5 }}>
-        {movie.content.replace(/<[^>]+>/g, "")}
-      </Text>
+    <ScrollView style={styles.container}>
 
-      {/* Danh sách server */}
-      <FlatList
-        data={movie.episodes}
-        keyExtractor={(srv) => srv.server_name}
-        horizontal
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={{
-              padding: 10,
-              margin: 5,
-              backgroundColor:
-                selectedServer?.server_name === item.server_name
-                  ? "#2196F3"
-                  : "#ddd",
-              borderRadius: 5,
-            }}
-            onPress={() => {
-              setSelectedServer(item);
-              setSelectedEpisode(item.server_data[0]);
-            }}
-          >
-            <Text
-              style={{
-                color:
-                  selectedServer?.server_name === item.server_name
-                    ? "#fff"
-                    : "#000",
-              }}
-            >
-              {item.server_name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      {/* BANNER hoặc PLAYER */}
 
-      {/* Danh sách tập */}
-      {selectedServer && (
-        <FlatList
-          data={selectedServer.server_data}
-          keyExtractor={(ep) => ep.slug}
-          horizontal
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={{
-                padding: 10,
-                margin: 5,
-                backgroundColor:
-                  selectedEpisode?.slug === item.slug ? "#2196F3" : "#ddd",
-                borderRadius: 5,
-              }}
-              onPress={() => setSelectedEpisode(item)}
-            >
-              <Text
-                style={{
-                  color:
-                    selectedEpisode?.slug === item.slug ? "#fff" : "#000",
-                }}
-              >
-                Tập {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
+      {selectedEpisode ? (
+        <VideoPlayer
+          key={selectedEpisode.slug}
+          uri={selectedEpisode.link_m3u8}
+        />
+      ) : (
+        <Image
+          source={{
+            uri: IMAGE_DOMAIN + movie.thumb_url,
+          }}
+          style={styles.banner}
         />
       )}
 
-      {/* Player với expo-video */}
-      {selectedEpisode?.link_m3u8 && (
-        <VideoPlayer key={selectedEpisode.slug} uri={selectedEpisode.link_m3u8} />
+      {/* TITLE */}
+
+      <Text style={styles.title}>{movie.name}</Text>
+
+      <Text style={styles.meta}>
+        {movie.year} • {movie.lang} • {movie.time}
+      </Text>
+
+      {/* DESCRIPTION */}
+
+      <Text style={styles.desc}>{cleanContent}</Text>
+
+      {/* SERVER */}
+
+      <Text style={styles.section}>Server</Text>
+
+      <FlatList
+        horizontal
+        data={servers}
+        keyExtractor={(item) => item.server_name}
+        renderItem={({ item }) => {
+          const active =
+            selectedServer?.server_name === item.server_name;
+
+          return (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                active && styles.buttonActive,
+              ]}
+              onPress={() => {
+                setSelectedServer(item);
+                setSelectedEpisode(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.buttonText,
+                  active && styles.buttonTextActive,
+                ]}
+              >
+                {item.server_name}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
+
+      {/* EPISODES */}
+
+      <Text style={styles.section}>Tập</Text>
+
+      {selectedServer && (
+        <FlatList
+          horizontal
+          data={selectedServer.server_data}
+          keyExtractor={(item) => item.slug}
+          renderItem={({ item }) => {
+            const active =
+              selectedEpisode?.slug === item.slug;
+
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  active && styles.buttonActive,
+                ]}
+                onPress={() => setSelectedEpisode(item)}
+              >
+                <Text
+                  style={[
+                    styles.buttonText,
+                    active && styles.buttonTextActive,
+                  ]}
+                >
+                  Tập {item.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
       )}
-    </View>
+    </ScrollView>
   );
 }
+
+/* ---------------- STYLE ---------------- */
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 10,
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  banner: {
+    width: "100%",
+    height: 220,
+    borderRadius: 8,
+  },
+
+  player: {
+    width: "100%",
+    height: 220,
+    backgroundColor: "black",
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+
+  meta: {
+    color: "gray",
+    marginVertical: 5,
+  },
+
+  desc: {
+    marginVertical: 10,
+    lineHeight: 20,
+  },
+
+  section: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+
+  button: {
+    padding: 10,
+    backgroundColor: "#ddd",
+    margin: 5,
+    borderRadius: 6,
+  },
+
+  buttonActive: {
+    backgroundColor: "#2196F3",
+  },
+
+  buttonText: {
+    color: "#000",
+  },
+
+  buttonTextActive: {
+    color: "#fff",
+  },
+});
